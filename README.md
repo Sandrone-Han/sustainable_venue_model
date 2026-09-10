@@ -78,6 +78,9 @@ sustainable_venue_model
 | File or Folder             | Description                                                                                                                           |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `main.py`                  | Main Python script containing data loading, distance calculation, route optimisation, carbon emission calculation, and visualisation. |
+| `config.json`              | Editable vehicle, energy, labour, treatment-cost, and emission assumptions. |
+| `requirements.txt`         | Pinned Python package required to regenerate the charts. |
+| `outputs/baseline_metrics.csv` | Reproducible baseline distance, emissions, runtime, and estimated per-trip costs. |
 | `README.md`                | Project documentation file.                                                                                                           |
 | `requirements.txt`         | List of required Python packages.                                                                                                     |
 | `data/venues.csv`          | Input dataset containing venue information.                                                                                           |
@@ -385,6 +388,20 @@ The project requires:
 Python 3
 matplotlib
 ```
+
+---
+
+## First-week cost baseline update
+
+Cost and emission assumptions are now stored in `config.json`, rather than in
+the Python source. The program also writes `outputs/baseline_metrics.csv` on
+each run. This makes the starting point for later cost optimisation explicit
+and repeatable.
+
+The cost baseline includes energy, driver labour, fixed vehicle cost, and food
+waste treatment. Values are demonstration assumptions in GBP per collection
+trip. Replace them with current supplier, payroll, fleet, and contractor data
+before using the result for an operational decision.
 
 The `requirements.txt` file should contain:
 

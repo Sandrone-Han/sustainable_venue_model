@@ -1,10 +1,20 @@
 import csv
+import json
 import math
 import itertools
-import os
+import time
 from pathlib import Path
 
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
+
+
+def read_config(config_path):
+    """Read model and cost assumptions from a JSON configuration file."""
+    with open(config_path, mode="r", encoding="utf-8") as file:
+        return json.load(file)
 
 
 def read_venues(csv_path):
@@ -89,6 +99,50 @@ def calculate_emissions(distance_km, emission_factor):
     Calculate carbon emissions.
     """
     return distance_km * emission_factor
+
+
+def calculate_operating_costs(distance_km, total_waste_kg, vehicle_type, config):
+    """Calculate an indicative per-trip operating cost baseline."""
+    vehicle = config["vehicles"][vehicle_type]
+    cost = config["costs"]
+
+    energy_units = distance_km * vehicle["energy_use_per_100_km"] / 100
+    energy_cost = energy_units * vehicle["energy_price_per_unit_gbp"]
+    labour_hours = distance_km / cost["average_speed_kmh"]
+    labour_cost = labour_hours * cost["labour_cost_per_hour_gbp"]
+    treatment_cost = total_waste_kg / 1000 * cost["waste_treatment_per_tonne_gbp"]
+    fixed_vehicle_cost = vehicle["fixed_cost_per_trip_gbp"]
+
+    return {
+        "energy_cost_gbp": energy_cost,
+        "labour_cost_gbp": labour_cost,
+        "fixed_vehicle_cost_gbp": fixed_vehicle_cost,
+        "waste_treatment_cost_gbp": treatment_cost,
+        "total_cost_gbp": energy_cost + labour_cost + fixed_vehicle_cost + treatment_cost
+    }
+
+
+def write_baseline_report(output_path, distance_km, total_waste_kg, emissions, costs, runtime_seconds):
+    """Write the reproducible first-week baseline to CSV."""
+    rows = [
+        ("route_distance", distance_km, "km"),
+        ("collected_food_waste", total_waste_kg, "kg"),
+        ("diesel_emissions", emissions["diesel"], "kg CO2"),
+        ("electric_emissions", emissions["electric"], "kg CO2"),
+        ("diesel_energy_cost", costs["diesel"]["energy_cost_gbp"], "GBP/trip"),
+        ("diesel_labour_cost", costs["diesel"]["labour_cost_gbp"], "GBP/trip"),
+        ("diesel_vehicle_cost", costs["diesel"]["fixed_vehicle_cost_gbp"], "GBP/trip"),
+        ("diesel_treatment_cost", costs["diesel"]["waste_treatment_cost_gbp"], "GBP/trip"),
+        ("diesel_total_cost", costs["diesel"]["total_cost_gbp"], "GBP/trip"),
+        ("electric_total_cost", costs["electric"]["total_cost_gbp"], "GBP/trip"),
+        ("runtime", runtime_seconds, "seconds")
+    ]
+
+    with open(output_path, mode="w", encoding="utf-8", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["metric", "value", "unit"])
+        for metric, value, unit in rows:
+            writer.writerow([metric, f"{value:.4f}", unit])
 
 
 def find_optimal_route(venues, distance_matrix):
@@ -210,6 +264,9 @@ def plot_route(venues, route, title, output_path):
     """
     Plot a route map and save it as an image.
     """
+    if plt is None:
+        return False
+
     x_values = []
     y_values = []
 
@@ -251,6 +308,7 @@ def plot_route(venues, route, title, output_path):
     plt.tight_layout()
     plt.savefig(output_path, dpi=300)
     plt.close()
+    return True
 
 
 def plot_emissions_comparison(
@@ -263,6 +321,9 @@ def plot_emissions_comparison(
     """
     Plot carbon emission comparison and save it as an image.
     """
+    if plt is None:
+        return False
+
     labels = [
         "Baseline Diesel",
         "Optimised Diesel",
@@ -297,24 +358,14 @@ def plot_emissions_comparison(
     plt.tight_layout()
     plt.savefig(output_path, dpi=300)
     plt.close()
-
-
-def set_current_directory_permissions(project_root):
-    """
-    Set files in the current project directory to 755 permissions.
-
-    On Windows, this may have limited effect, but the function is kept safe.
-    """
-    try:
-        for item in project_root.iterdir():
-            os.chmod(item, 0o755)
-    except Exception as error:
-        print(f"Permission update skipped: {error}")
+    return True
 
 
 def main():
+    start_time = time.perf_counter()
     project_root = Path(__file__).parent
     csv_path = project_root / "data" / "venues.csv"
+    config_path = project_root / "config.json"
     output_dir = project_root / "outputs"
 
     output_dir.mkdir(exist_ok=True)
@@ -323,13 +374,18 @@ def main():
         print(f"Error: CSV file not found at {csv_path}")
         return
 
+    if not config_path.exists():
+        print(f"Error: configuration file not found at {config_path}")
+        return
+
+    config = read_config(config_path)
     venues = read_venues(csv_path)
     distance_matrix = build_distance_matrix(venues)
 
     total_waste = calculate_total_waste(venues)
 
-    diesel_emission_factor = 0.25
-    ev_emission_factor = 0.08
+    diesel_emission_factor = config["vehicles"]["diesel"]["emission_factor_kg_per_km"]
+    ev_emission_factor = config["vehicles"]["electric"]["emission_factor_kg_per_km"]
 
     baseline_route = [0, 1, 2, 3, 4, 5, 0]
     baseline_distance = calculate_route_distance(baseline_route, distance_matrix)
@@ -356,25 +412,33 @@ def main():
         ev_emission_factor
     )
 
+    baseline_costs = {
+        vehicle_type: calculate_operating_costs(
+            baseline_distance, total_waste, vehicle_type, config
+        )
+        for vehicle_type in ("diesel", "electric")
+    }
+
     baseline_route_image = output_dir / "baseline_route_map.png"
     optimal_route_image = output_dir / "optimised_route_map.png"
     emissions_image = output_dir / "emissions_comparison.png"
+    baseline_report = output_dir / "baseline_metrics.csv"
 
-    plot_route(
+    baseline_chart_created = plot_route(
         venues,
         baseline_route,
         "Baseline Food Waste Collection Route",
         baseline_route_image
     )
 
-    plot_route(
+    optimal_chart_created = plot_route(
         venues,
         optimal_route,
         "Optimised Food Waste Collection Route",
         optimal_route_image
     )
 
-    plot_emissions_comparison(
+    emissions_chart_created = plot_emissions_comparison(
         baseline_diesel_emissions,
         optimal_diesel_emissions,
         baseline_ev_emissions,
@@ -413,14 +477,34 @@ def main():
         optimal_ev_emissions
     )
 
-    print("\nFigures saved successfully:")
+    print("\nIndicative baseline operating cost per trip:")
     print("-" * 80)
-    print(f"Baseline route map:     {baseline_route_image}")
-    print(f"Optimised route map:    {optimal_route_image}")
-    print(f"Emissions comparison:   {emissions_image}")
+    for vehicle_type, values in baseline_costs.items():
+        print(f"{vehicle_type.title():10s}: GBP {values['total_cost_gbp']:.2f}")
     print("-" * 80)
 
-    set_current_directory_permissions(project_root)
+    runtime_seconds = time.perf_counter() - start_time
+    write_baseline_report(
+        baseline_report,
+        baseline_distance,
+        total_waste,
+        {"diesel": baseline_diesel_emissions, "electric": baseline_ev_emissions},
+        baseline_costs,
+        runtime_seconds
+    )
+
+    print("\nOutput files:")
+    print("-" * 80)
+    if baseline_chart_created:
+        print(f"Baseline route map:     {baseline_route_image}")
+    if optimal_chart_created:
+        print(f"Optimised route map:    {optimal_route_image}")
+    if emissions_chart_created:
+        print(f"Emissions comparison:   {emissions_image}")
+    print(f"Baseline metrics:       {baseline_report}")
+    if plt is None:
+        print("Charts skipped: install dependencies from requirements.txt to regenerate them.")
+    print("-" * 80)
 
 
 if __name__ == "__main__":

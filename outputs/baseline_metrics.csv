@@ -1,0 +1,12 @@
+metric,value,unit
+route_distance,29.7173,km
+collected_food_waste,4040.0000,kg
+diesel_emissions,7.4293,kg CO2
+electric_emissions,2.3774,kg CO2
+diesel_energy_cost,8.2911,GBP/trip
+diesel_labour_cost,17.8304,GBP/trip
+diesel_vehicle_cost,25.0000,GBP/trip
+diesel_treatment_cost,303.0000,GBP/trip
+diesel_total_cost,354.1215,GBP/trip
+electric_total_cost,353.2078,GBP/trip
+runtime,0.0006,seconds

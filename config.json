@@ -1,0 +1,22 @@
+{
+  "vehicles": {
+    "diesel": {
+      "emission_factor_kg_per_km": 0.25,
+      "energy_use_per_100_km": 18.0,
+      "energy_price_per_unit_gbp": 1.55,
+      "fixed_cost_per_trip_gbp": 25.0
+    },
+    "electric": {
+      "emission_factor_kg_per_km": 0.08,
+      "energy_use_per_100_km": 32.0,
+      "energy_price_per_unit_gbp": 0.25,
+      "fixed_cost_per_trip_gbp": 30.0
+    }
+  },
+  "costs": {
+    "average_speed_kmh": 30.0,
+    "labour_cost_per_hour_gbp": 18.0,
+    "waste_treatment_per_tonne_gbp": 75.0
+  },
+  "notes": "Demonstration assumptions only. Replace with supplier, payroll and waste contractor data before operational use."
+}
