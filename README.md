@@ -403,6 +403,36 @@ waste treatment. Values are demonstration assumptions in GBP per collection
 trip. Replace them with current supplier, payroll, fleet, and contractor data
 before using the result for an operational decision.
 
+---
+
+## Second-week cost comparison update
+
+The model now calculates the same cost components for both the baseline and
+optimised routes, for diesel and electric vehicles. It reports the saving in
+GBP per trip and as a percentage of the baseline total.
+
+New outputs:
+
+```text
+outputs/cost_comparison.csv
+outputs/cost_comparison.png
+```
+
+The CSV contains the baseline, optimised, and saved amount for every cost
+component. The stacked chart shows why route optimisation reduces energy and
+labour costs but does not change the fixed vehicle or waste-treatment costs.
+
+Run the automated cost checks with:
+
+```bash
+py -m unittest discover -s tests
+```
+
+Using the demonstration assumptions, route optimisation saves approximately
+GBP 2.10 per diesel collection trip (0.59%) or GBP 1.62 per electric collection
+trip (0.46%). The small total percentage occurs because treatment cost is the
+largest component and is unchanged by route order alone.
+
 The `requirements.txt` file should contain:
 
 ```text
