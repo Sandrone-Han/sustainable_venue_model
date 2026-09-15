@@ -122,6 +122,21 @@ def calculate_operating_costs(distance_km, total_waste_kg, vehicle_type, config)
     }
 
 
+def calculate_cost_savings(baseline_costs, optimal_costs):
+    """Calculate savings for each vehicle type."""
+    savings = {}
+    for vehicle_type in baseline_costs:
+        baseline_total = baseline_costs[vehicle_type]["total_cost_gbp"]
+        optimal_total = optimal_costs[vehicle_type]["total_cost_gbp"]
+        amount = baseline_total - optimal_total
+        percentage = amount / baseline_total * 100 if baseline_total else 0.0
+        savings[vehicle_type] = {
+            "amount_gbp": amount,
+            "percentage": percentage
+        }
+    return savings
+
+
 def write_baseline_report(output_path, distance_km, total_waste_kg, emissions, costs, runtime_seconds):
     """Write the reproducible first-week baseline to CSV."""
     rows = [
@@ -143,6 +158,63 @@ def write_baseline_report(output_path, distance_km, total_waste_kg, emissions, c
         writer.writerow(["metric", "value", "unit"])
         for metric, value, unit in rows:
             writer.writerow([metric, f"{value:.4f}", unit])
+
+
+def write_cost_comparison_report(output_path, baseline_costs, optimal_costs, savings):
+    """Write baseline-versus-optimised cost details to CSV."""
+    components = (
+        "energy_cost_gbp",
+        "labour_cost_gbp",
+        "fixed_vehicle_cost_gbp",
+        "waste_treatment_cost_gbp",
+        "total_cost_gbp"
+    )
+
+    with open(output_path, mode="w", encoding="utf-8", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow([
+            "vehicle", "cost_component", "baseline_gbp", "optimised_gbp",
+            "saving_gbp", "saving_percent"
+        ])
+        for vehicle_type in baseline_costs:
+            for component in components:
+                baseline_value = baseline_costs[vehicle_type][component]
+                optimal_value = optimal_costs[vehicle_type][component]
+                amount = baseline_value - optimal_value
+                percentage = amount / baseline_value * 100 if baseline_value else 0.0
+                writer.writerow([
+                    vehicle_type,
+                    component,
+                    f"{baseline_value:.4f}",
+                    f"{optimal_value:.4f}",
+                    f"{amount:.4f}",
+                    f"{percentage:.2f}"
+                ])
+
+
+def print_cost_comparison(baseline_costs, optimal_costs, savings):
+    """Print cost components and route-optimisation savings."""
+    labels = (
+        ("Energy", "energy_cost_gbp"),
+        ("Labour", "labour_cost_gbp"),
+        ("Vehicle", "fixed_vehicle_cost_gbp"),
+        ("Treatment", "waste_treatment_cost_gbp"),
+        ("Total", "total_cost_gbp")
+    )
+    print("\nCost comparison per collection trip:")
+    print("-" * 80)
+    for vehicle_type in baseline_costs:
+        print(f"{vehicle_type.title()} vehicle")
+        for label, key in labels:
+            print(
+                f"  {label:10s} baseline GBP {baseline_costs[vehicle_type][key]:8.2f}"
+                f" | optimised GBP {optimal_costs[vehicle_type][key]:8.2f}"
+            )
+        print(
+            f"  Saving     GBP {savings[vehicle_type]['amount_gbp']:.2f}"
+            f" ({savings[vehicle_type]['percentage']:.2f}%)"
+        )
+    print("-" * 80)
 
 
 def find_optimal_route(venues, distance_matrix):
@@ -418,11 +490,19 @@ def main():
         )
         for vehicle_type in ("diesel", "electric")
     }
+    optimal_costs = {
+        vehicle_type: calculate_operating_costs(
+            optimal_distance, total_waste, vehicle_type, config
+        )
+        for vehicle_type in ("diesel", "electric")
+    }
+    cost_savings = calculate_cost_savings(baseline_costs, optimal_costs)
 
     baseline_route_image = output_dir / "baseline_route_map.png"
     optimal_route_image = output_dir / "optimised_route_map.png"
     emissions_image = output_dir / "emissions_comparison.png"
     baseline_report = output_dir / "baseline_metrics.csv"
+    cost_report = output_dir / "cost_comparison.csv"
 
     baseline_chart_created = plot_route(
         venues,
@@ -477,11 +557,7 @@ def main():
         optimal_ev_emissions
     )
 
-    print("\nIndicative baseline operating cost per trip:")
-    print("-" * 80)
-    for vehicle_type, values in baseline_costs.items():
-        print(f"{vehicle_type.title():10s}: GBP {values['total_cost_gbp']:.2f}")
-    print("-" * 80)
+    print_cost_comparison(baseline_costs, optimal_costs, cost_savings)
 
     runtime_seconds = time.perf_counter() - start_time
     write_baseline_report(
@@ -491,6 +567,9 @@ def main():
         {"diesel": baseline_diesel_emissions, "electric": baseline_ev_emissions},
         baseline_costs,
         runtime_seconds
+    )
+    write_cost_comparison_report(
+        cost_report, baseline_costs, optimal_costs, cost_savings
     )
 
     print("\nOutput files:")
@@ -502,6 +581,7 @@ def main():
     if emissions_chart_created:
         print(f"Emissions comparison:   {emissions_image}")
     print(f"Baseline metrics:       {baseline_report}")
+    print(f"Cost comparison:        {cost_report}")
     if plt is None:
         print("Charts skipped: install dependencies from requirements.txt to regenerate them.")
     print("-" * 80)

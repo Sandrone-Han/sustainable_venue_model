@@ -1,0 +1,11 @@
+vehicle,cost_component,baseline_gbp,optimised_gbp,saving_gbp,saving_percent
+diesel,energy_cost_gbp,8.2911,7.6255,0.6656,8.03
+diesel,labour_cost_gbp,17.8304,16.3989,1.4315,8.03
+diesel,fixed_vehicle_cost_gbp,25.0000,25.0000,0.0000,0.00
+diesel,waste_treatment_cost_gbp,303.0000,303.0000,0.0000,0.00
+diesel,total_cost_gbp,354.1215,352.0244,2.0971,0.59
+electric,energy_cost_gbp,2.3774,2.1865,0.1909,8.03
+electric,labour_cost_gbp,17.8304,16.3989,1.4315,8.03
+electric,fixed_vehicle_cost_gbp,30.0000,30.0000,0.0000,0.00
+electric,waste_treatment_cost_gbp,303.0000,303.0000,0.0000,0.00
+electric,total_cost_gbp,353.2078,351.5854,1.6224,0.46
