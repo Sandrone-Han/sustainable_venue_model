@@ -2,8 +2,14 @@ import csv
 import json
 import math
 import itertools
+import os
 import time
 from pathlib import Path
+
+os.environ.setdefault("MPLBACKEND", "Agg")
+matplotlib_cache = Path(__file__).parent / ".matplotlib"
+matplotlib_cache.mkdir(exist_ok=True)
+os.environ.setdefault("MPLCONFIGDIR", str(matplotlib_cache))
 
 try:
     import matplotlib.pyplot as plt
@@ -433,6 +439,45 @@ def plot_emissions_comparison(
     return True
 
 
+def plot_cost_comparison(baseline_costs, optimal_costs, output_path):
+    """Plot stacked cost components for all route and vehicle scenarios."""
+    if plt is None:
+        return False
+
+    scenarios = (
+        ("Baseline\nDiesel", baseline_costs["diesel"]),
+        ("Optimised\nDiesel", optimal_costs["diesel"]),
+        ("Baseline\nElectric", baseline_costs["electric"]),
+        ("Optimised\nElectric", optimal_costs["electric"])
+    )
+    components = (
+        ("Energy", "energy_cost_gbp"),
+        ("Labour", "labour_cost_gbp"),
+        ("Vehicle", "fixed_vehicle_cost_gbp"),
+        ("Treatment", "waste_treatment_cost_gbp")
+    )
+    x_positions = list(range(len(scenarios)))
+    bottoms = [0.0] * len(scenarios)
+
+    plt.figure(figsize=(10, 6))
+    for label, key in components:
+        values = [costs[key] for _, costs in scenarios]
+        plt.bar(x_positions, values, bottom=bottoms, label=label)
+        bottoms = [bottom + value for bottom, value in zip(bottoms, values)]
+
+    for index, total in enumerate(bottoms):
+        plt.text(index, total, f"GBP {total:.2f}", ha="center", va="bottom")
+
+    plt.xticks(x_positions, [label for label, _ in scenarios])
+    plt.title("Collection Cost Comparison per Trip")
+    plt.ylabel("Cost, GBP")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300)
+    plt.close()
+    return True
+
+
 def main():
     start_time = time.perf_counter()
     project_root = Path(__file__).parent
@@ -501,6 +546,7 @@ def main():
     baseline_route_image = output_dir / "baseline_route_map.png"
     optimal_route_image = output_dir / "optimised_route_map.png"
     emissions_image = output_dir / "emissions_comparison.png"
+    costs_image = output_dir / "cost_comparison.png"
     baseline_report = output_dir / "baseline_metrics.csv"
     cost_report = output_dir / "cost_comparison.csv"
 
@@ -524,6 +570,9 @@ def main():
         baseline_ev_emissions,
         optimal_ev_emissions,
         emissions_image
+    )
+    costs_chart_created = plot_cost_comparison(
+        baseline_costs, optimal_costs, costs_image
     )
 
     print_venues(venues)
@@ -580,6 +629,8 @@ def main():
         print(f"Optimised route map:    {optimal_route_image}")
     if emissions_chart_created:
         print(f"Emissions comparison:   {emissions_image}")
+    if costs_chart_created:
+        print(f"Cost comparison chart:  {costs_image}")
     print(f"Baseline metrics:       {baseline_report}")
     print(f"Cost comparison:        {cost_report}")
     if plt is None:
